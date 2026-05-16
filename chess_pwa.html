@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ajedrez">
+<meta name="theme-color" content="#1a1a2e">
+<title>Ajedrez vs IA</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#1a1a2e;color:#eee;font-family:system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:10px}
+h1{font-size:1.4rem;margin:8px 0 4px;color:#f0c040;letter-spacing:2px}
+#controls{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap;justify-content:center;align-items:center}
+select,button{background:#16213e;color:#eee;border:1px solid #444;border-radius:6px;padding:6px 12px;font-size:0.9rem;cursor:pointer}
+button:hover{background:#0f3460}
+button.active{background:#e94560;border-color:#e94560}
+#status{font-size:0.95rem;margin:6px 0;min-height:22px;color:#f0c040;text-align:center}
+#board-wrap{position:relative}
+#board{display:grid;grid-template-columns:repeat(8,1fr);border:3px solid #f0c040;border-radius:4px;overflow:hidden;touch-action:none}
+.sq{width:min(11vw,64px);height:min(11vw,64px);display:flex;align-items:center;justify-content:center;font-size:min(9vw,54px);cursor:pointer;user-select:none;transition:background 0.15s;position:relative}
+.light{background:#f0d9b5}
+.dark{background:#b58863}
+.selected{background:#7fc97f!important}
+.hint{background:#84c7f0!important}
+.last{filter:brightness(1.2)}
+.piece{display:inline-block;line-height:1}
+.piece-w{filter:brightness(0) invert(1) drop-shadow(0 0 1px #333) drop-shadow(0 1px 2px rgba(0,0,0,0.7))}
+.piece-b{filter:brightness(0) drop-shadow(0 1px 2px rgba(0,0,0,0.4))}
+#info{display:flex;gap:16px;margin:8px 0;font-size:0.85rem;color:#aaa}
+#moves{max-height:120px;overflow-y:auto;background:#16213e;border-radius:6px;padding:6px 10px;font-size:0.78rem;font-family:monospace;width:min(88vw,520px);color:#ccc}
+#moves span{display:inline-block;min-width:60px;margin:1px 4px}
+</style>
+</head>
+<body>
+<h1>♟ AJEDREZ VS IA</h1>
+<div id="controls">
+  <label style="font-size:0.85rem;color:#aaa">Dificultad:</label>
+  <select id="diff">
+    <option value="1">🟢 Fácil</option>
+    <option value="2" selected>🟡 Medio</option>
+    <option value="3">🔴 Difícil</option>
+  </select>
+  <button onclick="newGame()">Nueva partida</button>
+</div>
+<div id="status">Turno: Blancas (tú)</div>
+<div id="board-wrap"><div id="board"></div></div>
+<div id="info"><span id="captured-w">Capturas blancas: —</span><span id="captured-b">Capturas negras: —</span></div>
+<div id="moves"></div>
+
+<script>
+// Use filled (black) symbols for all pieces — CSS filter will colorize them
+const PIECES={K:'♚',Q:'♛',R:'♜',B:'♝',N:'♞',P:'♟',k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'};
+let board,turn,selected,hints,lastMove,gameOver,capW,capB,moveList,enPassant,castleRights,halfMove,aiThinking;
+
+function initBoard(){
+  board=Array(64).fill(null);
+  const rows=['r','n','b','q','k','b','n','r'];
+  for(let i=0;i<8;i++){board[i]=rows[i];board[8+i]='p';board[48+i]='P';board[56+i]=rows[i].toUpperCase();}
+  turn='w';selected=null;hints=[];lastMove=null;gameOver=false;capW=[];capB=[];moveList=[];
+  enPassant=null;castleRights={wK:true,wQ:true,bK:true,bQ:true};halfMove=0;aiThinking=false;
+  render();updateStatus();document.getElementById('moves').innerHTML='';
+  document.getElementById('captured-w').textContent='Capturas blancas: —';
+  document.getElementById('captured-b').textContent='Capturas negras: —';
+}
+
+function isWhite(p){return p&&p===p.toUpperCase()}
+function isBlack(p){return p&&p===p.toLowerCase()}
+function color(p){return p?(isWhite(p)?'w':'b'):null}
+function row(i){return Math.floor(i/8)}
+function col(i){return i%8}
+function idx(r,c){return r*8+c}
+
+function newGame(){initBoard()}
+
+function getLegalMoves(from,b,t,ep,cr){
+  const moves=[];
+  const p=b[from];if(!p)return moves;
+  const pc=color(p),opp=pc==='w'?'b':'w';
+  const r=row(from),c=col(from);
+  const pt=p.toLowerCase();
+
+  const add=(to)=>{if(to>=0&&to<64)moves.push(to)};
+  const addIfEnemy=(to)=>{if(to>=0&&to<64&&b[to]&&color(b[to])===opp)moves.push(to)};
+  const slide=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){const ti=idx(nr,nc);if(b[ti]){if(color(b[ti])===opp)moves.push(ti);break;}moves.push(ti);nr+=dr;nc+=dc;}};
+
+  if(pt==='p'){
+    const dir=pc==='w'?-1:1;
+    const start=pc==='w'?6:1;
+    const nr=r+dir;
+    if(nr>=0&&nr<8){
+      if(!b[idx(nr,c)])moves.push(idx(nr,c));
+      if(r===start&&!b[idx(nr,c)]&&!b[idx(r+2*dir,c)])moves.push(idx(r+2*dir,c));
+      if(c>0&&b[idx(nr,c-1)]&&color(b[idx(nr,c-1)])===opp)moves.push(idx(nr,c-1));
+      if(c<7&&b[idx(nr,c+1)]&&color(b[idx(nr,c+1)])===opp)moves.push(idx(nr,c+1));
+      if(ep!==null){
+        if(ep===idx(nr,c-1)||ep===idx(nr,c+1))moves.push(ep);
+      }
+    }
+  } else if(pt==='n'){
+    [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>{
+      const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8){const ti=idx(nr,nc);if(color(b[ti])!==pc)moves.push(ti);}
+    });
+  } else if(pt==='b'){
+    [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc])=>slide(dr,dc));
+  } else if(pt==='r'){
+    [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc])=>slide(dr,dc));
+  } else if(pt==='q'){
+    [[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc])=>slide(dr,dc));
+  } else if(pt==='k'){
+    [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc])=>{
+      const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8){const ti=idx(nr,nc);if(color(b[ti])!==pc)moves.push(ti);}
+    });
+    if(pc==='w'&&cr.wK&&!b[61]&&!b[62]&&!isAttacked(60,'b',b)&&!isAttacked(61,'b',b)&&!isAttacked(62,'b',b))moves.push(62);
+    if(pc==='w'&&cr.wQ&&!b[57]&&!b[58]&&!b[59]&&!isAttacked(60,'b',b)&&!isAttacked(59,'b',b)&&!isAttacked(58,'b',b))moves.push(58);
+    if(pc==='b'&&cr.bK&&!b[5]&&!b[6]&&!isAttacked(4,'w',b)&&!isAttacked(5,'w',b)&&!isAttacked(6,'w',b))moves.push(6);
+    if(pc==='b'&&cr.bQ&&!b[1]&&!b[2]&&!b[3]&&!isAttacked(4,'w',b)&&!isAttacked(3,'w',b)&&!isAttacked(2,'w',b))moves.push(2);
+  }
+  return moves.filter(to=>{
+    const nb=b.slice();const cap=nb[to];nb[to]=nb[from];nb[from]=null;
+    if(pt==='p'&&ep===to){const epCapR=row(from),epCapC=col(to);nb[idx(epCapR,epCapC)]=null;}
+    const kPos=nb.indexOf(pc==='w'?'K':'k');
+    return kPos>=0&&!isAttacked(kPos,opp,nb);
+  });
+}
+
+function isAttacked(sq,byColor,b){
+  for(let i=0;i<64;i++){
+    const p=b[i];if(!p||color(p)!==byColor)continue;
+    const moves=getRawMoves(i,b);
+    if(moves.includes(sq))return true;
+  }
+  return false;
+}
+
+function getRawMoves(from,b){
+  const moves=[];const p=b[from];if(!p)return moves;
+  const pc=color(p),opp=pc==='w'?'b':'w';
+  const r=row(from),c=col(from),pt=p.toLowerCase();
+  const slide=(dr,dc)=>{let nr=r+dr,nc=c+dc;while(nr>=0&&nr<8&&nc>=0&&nc<8){const ti=idx(nr,nc);if(b[ti]){if(color(b[ti])===opp)moves.push(ti);break;}moves.push(ti);nr+=dr;nc+=dc;}};
+  if(pt==='p'){const dir=pc==='w'?-1:1;const nr=r+dir;if(nr>=0&&nr<8){if(c>0)moves.push(idx(nr,c-1));if(c<7)moves.push(idx(nr,c+1));}}
+  else if(pt==='n'){[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc])=>{const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8)moves.push(idx(nr,nc));});}
+  else if(pt==='b'){[[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc])=>slide(dr,dc));}
+  else if(pt==='r'){[[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc])=>slide(dr,dc));}
+  else if(pt==='q'){[[-1,-1],[-1,1],[1,-1],[1,1],[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc])=>slide(dr,dc));}
+  else if(pt==='k'){[[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc])=>{const nr=r+dr,nc=c+dc;if(nr>=0&&nr<8&&nc>=0&&nc<8)moves.push(idx(nr,nc));});}
+  return moves;
+}
+
+function applyMove(from,to,b,t,ep,cr){
+  const nb=b.slice();const ncr={...cr};let nep=null;
+  const p=nb[from];const cap=nb[to];const pt=p.toLowerCase();
+  nb[to]=nb[from];nb[from]=null;
+  if(pt==='p'){
+    if(to===ep){const epCapR=row(from),epCapC=col(to);nb[idx(epCapR,epCapC)]=null;}
+    if(Math.abs(row(to)-row(from))===2)nep=idx((row(from)+row(to))/2,col(from));
+    if(row(to)===0)nb[to]='Q';
+    if(row(to)===7)nb[to]='q';
+  }
+  if(pt==='k'){
+    if(t==='w'){ncr.wK=false;ncr.wQ=false;}else{ncr.bK=false;ncr.bQ=false;}
+    if(to===62&&from===60){nb[61]=nb[63];nb[63]=null;}
+    if(to===58&&from===60){nb[59]=nb[56];nb[56]=null;}
+    if(to===6&&from===4){nb[5]=nb[7];nb[7]=null;}
+    if(to===2&&from===4){nb[3]=nb[0];nb[0]=null;}
+  }
+  if(pt==='r'){if(from===63)ncr.wK=false;if(from===56)ncr.wQ=false;if(from===7)ncr.bK=false;if(from===0)ncr.bQ=false;}
+  return{board:nb,ep:nep,cr:ncr,cap};
+}
+
+const VALS={p:100,n:320,b:330,r:500,q:900,k:20000};
+const PST={
+  p:[0,0,0,0,0,0,0,0,50,50,50,50,50,50,50,50,10,10,20,30,30,20,10,10,5,5,10,25,25,10,5,5,0,0,0,20,20,0,0,0,5,-5,-10,0,0,-10,-5,5,5,10,10,-20,-20,10,10,5,0,0,0,0,0,0,0,0],
+  n:[-50,-40,-30,-30,-30,-30,-40,-50,-40,-20,0,0,0,0,-20,-40,-30,0,10,15,15,10,0,-30,-30,5,15,20,20,15,5,-30,-30,0,15,20,20,15,0,-30,-30,5,10,15,15,10,5,-30,-40,-20,0,5,5,0,-20,-40,-50,-40,-30,-30,-30,-30,-40,-50],
+  b:[-20,-10,-10,-10,-10,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,10,10,5,0,-10,-10,5,5,10,10,5,5,-10,-10,0,10,10,10,10,0,-10,-10,10,10,10,10,10,10,-10,-10,5,0,0,0,0,5,-10,-20,-10,-10,-10,-10,-10,-10,-20],
+  r:[0,0,0,0,0,0,0,0,5,10,10,10,10,10,10,5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,-5,0,0,0,0,0,0,-5,0,0,0,5,5,0,0,0],
+  q:[-20,-10,-10,-5,-5,-10,-10,-20,-10,0,0,0,0,0,0,-10,-10,0,5,5,5,5,0,-10,-5,0,5,5,5,5,0,-5,0,0,5,5,5,5,0,-5,-10,5,5,5,5,5,0,-10,-10,0,5,0,0,0,0,-10,-20,-10,-10,-5,-5,-10,-10,-20],
+  k:[-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-30,-40,-40,-50,-50,-40,-40,-30,-20,-30,-30,-40,-40,-30,-30,-20,-10,-20,-20,-20,-20,-20,-20,-10,20,20,0,0,0,0,20,20,20,30,10,0,0,10,30,20]
+};
+
+function evalBoard(b){
+  let score=0;
+  for(let i=0;i<64;i++){
+    const p=b[i];if(!p)continue;
+    const pt=p.toLowerCase();const w=isWhite(p);
+    const val=VALS[pt]||0;
+    const pstIdx=w?i:(63-i);
+    const pos=PST[pt]?PST[pt][pstIdx]:0;
+    score+=(w?1:-1)*(val+pos);
+  }
+  return score;
+}
+
+function minimax(b,depth,alpha,beta,maxing,t,ep,cr){
+  const moves=getAllMoves(t,b,ep,cr);
+  if(depth===0||moves.length===0){
+    if(moves.length===0){
+      const kPos=b.indexOf(t==='w'?'K':'k');
+      if(kPos>=0&&isAttacked(kPos,t==='w'?'b':'w',b))return maxing?-99999:99999;
+      return 0;
+    }
+    return evalBoard(b);
+  }
+  if(maxing){
+    let best=-Infinity;
+    for(const [from,to] of moves){
+      const{board:nb,ep:nep,cr:ncr}=applyMove(from,to,b,t,ep,cr);
+      best=Math.max(best,minimax(nb,depth-1,alpha,beta,false,t==='w'?'b':'w',nep,ncr));
+      alpha=Math.max(alpha,best);
+      if(beta<=alpha)break;
+    }
+    return best;
+  } else {
+    let best=Infinity;
+    for(const [from,to] of moves){
+      const{board:nb,ep:nep,cr:ncr}=applyMove(from,to,b,t,ep,cr);
+      best=Math.min(best,minimax(nb,depth-1,alpha,beta,true,t==='w'?'b':'w',nep,ncr));
+      beta=Math.min(beta,best);
+      if(beta<=alpha)break;
+    }
+    return best;
+  }
+}
+
+function getAllMoves(t,b,ep,cr){
+  const moves=[];
+  for(let i=0;i<64;i++){
+    if(color(b[i])!==t)continue;
+    const ms=getLegalMoves(i,b,t,ep,cr);
+    ms.forEach(m=>moves.push([i,m]));
+  }
+  return moves;
+}
+
+function aiMove(){
+  if(gameOver||aiThinking)return;
+  aiThinking=true;
+  document.getElementById('status').textContent='IA pensando...';
+  setTimeout(()=>{
+    const diff=parseInt(document.getElementById('diff').value);
+    const moves=getAllMoves('b',board,enPassant,castleRights);
+    if(moves.length===0){checkEndGame();aiThinking=false;return;}
+    let chosen;
+    if(diff===1){
+      chosen=moves[Math.floor(Math.random()*moves.length)];
+    } else if(diff===2){
+      let best=-Infinity,bestMoves=[];
+      for(const [from,to] of moves){
+        const{board:nb,ep:nep,cr:ncr,cap}=applyMove(from,to,board,'b',enPassant,castleRights);
+        const sc=-evalBoard(nb)+(cap?VALS[cap.toLowerCase()]||0:0);
+        if(sc>best){best=sc;bestMoves=[[from,to]];}else if(sc===best)bestMoves.push([from,to]);
+      }
+      chosen=bestMoves[Math.floor(Math.random()*bestMoves.length)];
+    } else {
+      let best=-Infinity,bestMoves=[];
+      for(const [from,to] of moves){
+        const{board:nb,ep:nep,cr:ncr}=applyMove(from,to,board,'b',enPassant,castleRights);
+        const sc=minimax(nb,3,-Infinity,Infinity,false,'w',nep,ncr);
+        const sc2=-sc;
+        if(sc2>best){best=sc2;bestMoves=[[from,to]];}else if(sc2===best)bestMoves.push([from,to]);
+      }
+      chosen=bestMoves[Math.floor(Math.random()*bestMoves.length)];
+    }
+    const[from,to]=chosen;
+    const{board:nb,ep:nep,cr:ncr,cap}=applyMove(from,to,board,'b',enPassant,castleRights);
+    if(cap)capW.push(cap);
+    addMoveToList(from,to,board,'b',cap);
+    board=nb;enPassant=nep;castleRights=ncr;
+    lastMove=[from,to];turn='w';
+    render();updateStatus();checkEndGame();aiThinking=false;
+    updateCaptures();
+  },50);
+}
+
+function addMoveToList(from,to,b,t,cap){
+  const fc=String.fromCharCode(97+col(from))+(8-row(from));
+  const tc=String.fromCharCode(97+col(to))+(8-row(to));
+  const p=b[from];const pt=p?p.toUpperCase():'';
+  const notation=(pt==='P'||pt==='p'?'':pt)+fc+(cap?'x':'-')+tc;
+  moveList.push(notation);
+  const div=document.getElementById('moves');
+  if(t==='w'){
+    const n=Math.ceil(moveList.length/2);
+    div.innerHTML+=`<span>${n}. ${notation}</span>`;
+  } else {
+    div.innerHTML+=`<span>${notation}</span>`;
+  }
+  div.scrollTop=div.scrollHeight;
+}
+
+function updateCaptures(){
+  const cw=capW.map(p=>PIECES[p]||p).join('');
+  const cb=capB.map(p=>PIECES[p]||p).join('');
+  document.getElementById('captured-w').textContent='Capturas blancas: '+(cw||'—');
+  document.getElementById('captured-b').textContent='Capturas negras: '+(cb||'—');
+}
+
+function checkEndGame(){
+  const moves=getAllMoves(turn,board,enPassant,castleRights);
+  if(moves.length===0){
+    const kPos=board.indexOf(turn==='w'?'K':'k');
+    const inCheck=kPos>=0&&isAttacked(kPos,turn==='w'?'b':'w',board);
+    if(inCheck){
+      gameOver=true;
+      document.getElementById('status').textContent=turn==='w'?'¡Jaque mate! Ganó la IA':'¡Jaque mate! ¡Ganaste!';
+    } else {
+      gameOver=true;
+      document.getElementById('status').textContent='¡Tablas! (ahogado)';
+    }
+  }
+}
+
+function updateStatus(){
+  if(gameOver)return;
+  const kPos=board.indexOf(turn==='w'?'K':'k');
+  const inCheck=kPos>=0&&isAttacked(kPos,turn==='w'?'b':'w',board);
+  document.getElementById('status').textContent=(turn==='w'?'Turno: Blancas (tú)':'Turno: Negras (IA)')+(inCheck?' ¡JAQUE!':'');
+}
+
+function onSquareClick(i){
+  if(turn!=='w'||gameOver||aiThinking)return;
+  if(selected===null){
+    if(board[i]&&color(board[i])==='w'){
+      selected=i;
+      hints=getLegalMoves(i,board,'w',enPassant,castleRights);
+      render();
+    }
+  } else {
+    if(hints.includes(i)){
+      const{board:nb,ep:nep,cr:ncr,cap}=applyMove(selected,i,board,'w',enPassant,castleRights);
+      if(cap)capB.push(cap);
+      addMoveToList(selected,i,board,'w',cap);
+      board=nb;enPassant=nep;castleRights=ncr;
+      lastMove=[selected,i];turn='b';selected=null;hints=[];
+      render();updateStatus();updateCaptures();
+      checkEndGame();
+      if(!gameOver)setTimeout(aiMove,300);
+    } else if(board[i]&&color(board[i])==='w'){
+      selected=i;hints=getLegalMoves(i,board,'w',enPassant,castleRights);render();
+    } else {
+      selected=null;hints=[];render();
+    }
+  }
+}
+
+function render(){
+  const el=document.getElementById('board');el.innerHTML='';
+  // Render from index 0..63 but visually: white at bottom means row 7 (index 56-63) at screen-bottom.
+  // We render rows top-to-bottom: screen row 0 = board row 0 (rank 8, black side), screen row 7 = board row 7 (rank 1, white side).
+  // This is already correct for standard chess orientation (white at bottom), since initBoard puts white pieces at indices 48-63.
+  for(let i=0;i<64;i++){
+    const sq=document.createElement('div');
+    const r=row(i),c=col(i);
+    sq.className='sq '+((r+c)%2===0?'light':'dark');
+    if(selected===i)sq.classList.add('selected');
+    if(hints.includes(i))sq.classList.add('hint');
+    if(lastMove&&(lastMove[0]===i||lastMove[1]===i))sq.classList.add('last');
+    if(board[i]){
+      const span=document.createElement('span');
+      span.className='piece '+(isWhite(board[i])?'piece-w':'piece-b');
+      span.textContent=PIECES[board[i]];
+      sq.appendChild(span);
+    }
+    sq.addEventListener('click',()=>onSquareClick(i));
+    el.appendChild(sq);
+  }
+}
+
+initBoard();
+</script>
+</body>
+</html>
