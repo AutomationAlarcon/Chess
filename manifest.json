@@ -1,9 +1,9 @@
 {
-  "id": "./",
+  "id": "./chess_site_v3.html",
   "name": "Ajedrez vs Stockfish",
   "short_name": "Ajedrez",
   "description": "Aplicacion de ajedrez para jugar contra Stockfish.",
-  "start_url": "./",
+  "start_url": "./chess_site_v3.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

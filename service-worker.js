@@ -1,10 +1,11 @@
-const CACHE_NAME = 'chess-stockfish-pwa-v1';
+const CACHE_NAME = 'chess-stockfish-pwa-v3';
 
 const APP_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './chess_site_v2_stockfish_test.html',
+  './chess_site_v3.html',
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png',
