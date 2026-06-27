@@ -28,6 +28,31 @@ body{
   padding:10px
 }
 
+#orientationLock{
+  display:none
+}
+
+@media (orientation:landscape) and (hover:none) and (pointer:coarse){
+  body > :not(#orientationLock){
+    display:none!important
+  }
+
+  #orientationLock{
+    position:fixed;
+    inset:0;
+    z-index:999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:#1a1a2e;
+    color:#f0c040;
+    text-align:center;
+    font-size:1.2rem;
+    font-weight:700
+  }
+}
+
 h1{
   font-size:1.4rem;
   margin:8px 0 4px;
@@ -180,10 +205,21 @@ button.active{background:#e94560;border-color:#e94560}
 }
 
 #piecePalette{
-  display:grid;
-  grid-template-columns:repeat(7,1fr);
+  display:flex;
+  flex-direction:column;
   gap:6px;
   margin-top:8px
+}
+
+.paletteRow{
+  display:grid;
+  grid-template-columns:repeat(6,1fr);
+  gap:6px
+}
+
+.paletteRowClear{
+  display:flex;
+  justify-content:center
 }
 
 .palettePiece{
@@ -199,6 +235,10 @@ button.active{background:#e94560;border-color:#e94560}
   display:flex;
   align-items:center;
   justify-content:center
+}
+
+.paletteRowClear .palettePiece{
+  width:64px
 }
 
 .palettePiece.blackPiece{
@@ -273,6 +313,8 @@ button.active{background:#e94560;border-color:#e94560}
 </head>
 
 <body>
+
+<div id="orientationLock">Gira el móvil a vertical para jugar.</div>
 
 <h1>♟ CHESS SITE</h1>
 
@@ -360,9 +402,9 @@ let selectedEditorPiece='K';
 stockfishRequestId=0;
 
 const editorPieces=[
+  null,
   'K','Q','R','B','N','P',
-  'k','q','r','b','n','p',
-  null
+  'k','q','r','b','n','p'
 ];
 
 function initBoard(){
@@ -473,7 +515,17 @@ function renderPalette(){
 
   palette.innerHTML='';
 
-  editorPieces.forEach(piece=>{
+  const paletteRows=[
+    {className:'paletteRowClear',pieces:[null]},
+    {className:'paletteRow',pieces:['K','Q','R','B','N','P']},
+    {className:'paletteRow',pieces:['k','q','r','b','n','p']}
+  ];
+
+  paletteRows.forEach(rowConfig=>{
+    const row=document.createElement('div');
+    row.className=rowConfig.className;
+
+    rowConfig.pieces.forEach(piece=>{
 
     const div=document.createElement('div');
 
@@ -495,7 +547,10 @@ function renderPalette(){
       renderPalette();
     };
 
-    palette.appendChild(div);
+      row.appendChild(div);
+    });
+
+    palette.appendChild(row);
   });
 }
 
@@ -1618,11 +1673,20 @@ function render(){
 
 initBoard();
 
+function lockPortraitMode(){
+  if(screen.orientation&&screen.orientation.lock){
+    screen.orientation.lock('portrait').catch(()=>{});
+  }
+}
+
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('service-worker.js');
+    lockPortraitMode();
   });
 }
+
+window.addEventListener('orientationchange',lockPortraitMode);
 
 </script>
 
