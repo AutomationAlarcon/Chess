@@ -91,6 +91,15 @@ h1{
   align-items:center
 }
 
+#editorControls{
+  display:flex;
+  gap:8px;
+  margin:8px 0;
+  flex-wrap:wrap;
+  justify-content:center;
+  align-items:center
+}
+
 select,button{
   background:#16213e;
   color:#eee;
@@ -363,6 +372,11 @@ button.active{background:#e94560;border-color:#e94560}
 
 <div id="status" class="hidden">Turno: Blancas (tú)</div>
 
+<div id="editorControls" class="hidden">
+  <button onclick="clearBoard()">Vaciar tablero</button>
+  <button onclick="returnToMainMenu()">Menú principal</button>
+</div>
+
 <div id="board-wrap" class="hidden">
   <div id="board"></div>
 </div>
@@ -375,12 +389,6 @@ button.active{background:#e94560;border-color:#e94560}
 <div id="moves" class="hidden"></div>
 
 <div id="editorPanel" class="hidden">
-
-  <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap">
-    <button onclick="clearBoard()">Vaciar tablero</button>
-
-    <button onclick="returnToMainMenu()">Menú principal</button>
-  </div>
 
   <div style="margin-bottom:10px">
     <strong>Modo editor de posición</strong>
@@ -494,6 +502,7 @@ function setMode(mode){
   document.getElementById('mainMenu').classList.toggle('hidden',mode!=='menu');
   document.getElementById('controls').classList.toggle('hidden',mode!=='play');
   document.getElementById('status').classList.toggle('hidden',mode==='menu');
+  document.getElementById('editorControls').classList.toggle('hidden',mode!=='editor');
   document.getElementById('board-wrap').classList.toggle('hidden',mode==='menu');
   document.getElementById('info').classList.toggle('hidden',mode!=='play');
   document.getElementById('moves').classList.toggle('hidden',mode!=='play');
