@@ -1024,7 +1024,7 @@ function resolveGameEndForTurn(t){
   if(status.isMate){
     finishGame(
       t==='w'
-        ? 'Jaque mate: ganan negras (IA)'
+        ? 'Jaque mate: ganan negras'
         : 'Jaque mate: ganan blancas'
     );
     return true;
@@ -1462,7 +1462,7 @@ function aiMove(){
   const diff=parseInt(document.getElementById('diff').value);
 
   document.getElementById('status').textContent=
-    diff===1?'IA pensando...':'Stockfish pensando...';
+    diff===1?'Negras pensando...':'Stockfish pensando...';
 
   setTimeout(()=>{
 
@@ -1571,7 +1571,7 @@ function updateStatus(){
   document.getElementById('status').textContent=
     turn==='w'
       ? 'Turno: Blancas (tú)'
-      : 'Turno: Negras (IA)';
+      : 'Turno: Negras';
 }
 
 function onSquareClick(i){
