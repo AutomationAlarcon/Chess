@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chess-stockfish-pwa-v11';
+const CACHE_NAME = 'chess-stockfish-pwa-v12';
 
 const APP_ASSETS = [
   './',
