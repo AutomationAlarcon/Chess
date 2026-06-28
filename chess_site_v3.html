@@ -60,6 +60,28 @@ h1{
   letter-spacing:2px
 }
 
+#mainMenu{
+  width:min(92vw,420px);
+  min-height:60vh;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:stretch;
+  gap:16px
+}
+
+.menuActions{
+  display:flex;
+  flex-direction:column;
+  gap:12px
+}
+
+.menuActions button{
+  min-height:52px;
+  font-size:1rem;
+  font-weight:700
+}
+
 #controls{
   display:flex;
   gap:8px;
@@ -316,9 +338,16 @@ button.active{background:#e94560;border-color:#e94560}
 
 <div id="orientationLock">Gira el móvil a vertical para jugar.</div>
 
-<h1>♟ CHESS SITE</h1>
+<h1>♟ Aplicación de ajedrez</h1>
 
-<div id="controls">
+<div id="mainMenu">
+  <div class="menuActions">
+    <button onclick="startComputerMode()">Jugar contra el ordenador</button>
+    <button onclick="enterEditorMode()">Modo edición de partidas</button>
+  </div>
+</div>
+
+<div id="controls" class="hidden">
   <label class="smallLabel">Dificultad:</label>
 
   <select id="diff">
@@ -328,22 +357,22 @@ button.active{background:#e94560;border-color:#e94560}
   </select>
 
   <button onclick="newGame()">Nueva partida</button>
-  <button onclick="enterEditorMode()">Editor posición</button>
+  <button onclick="returnToMainMenu()">Menú principal</button>
   <button onclick="undoMove()" title="Deshacer movimiento">↶</button>
 </div>
 
-<div id="status">Turno: Blancas (tú)</div>
+<div id="status" class="hidden">Turno: Blancas (tú)</div>
 
-<div id="board-wrap">
+<div id="board-wrap" class="hidden">
   <div id="board"></div>
 </div>
 
-<div id="info">
+<div id="info" class="hidden">
   <span id="captured-w">Capturas blancas: —</span>
   <span id="captured-b">Capturas negras: —</span>
 </div>
 
-<div id="moves"></div>
+<div id="moves" class="hidden"></div>
 
 <div id="editorPanel" class="hidden">
 
@@ -360,14 +389,7 @@ button.active{background:#e94560;border-color:#e94560}
   <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
     <button onclick="clearBoard()">Vaciar tablero</button>
 
-    <button onclick="finishEditorMode()">
-      Jugar contra IA
-    </button>
-
-    <select id="editorTurn">
-      <option value="w">Juegan blancas</option>
-      <option value="b">Juegan negras</option>
-    </select>
+    <button onclick="returnToMainMenu()">Menú principal</button>
   </div>
 
 </div>
@@ -398,6 +420,7 @@ let stockfishWorker,stockfishFailed,stockfishBestMoveHandler,stockfishRequestId;
 
 let historyStack=[];
 let editorMode=false;
+let appMode='menu';
 let selectedEditorPiece='K';
 stockfishRequestId=0;
 
@@ -465,48 +488,50 @@ function clearBoard(){
   render();
 }
 
+function setMode(mode){
+  appMode=mode;
+
+  document.getElementById('mainMenu').classList.toggle('hidden',mode!=='menu');
+  document.getElementById('controls').classList.toggle('hidden',mode!=='play');
+  document.getElementById('status').classList.toggle('hidden',mode==='menu');
+  document.getElementById('board-wrap').classList.toggle('hidden',mode==='menu');
+  document.getElementById('info').classList.toggle('hidden',mode!=='play');
+  document.getElementById('moves').classList.toggle('hidden',mode!=='play');
+  document.getElementById('editorPanel').classList.toggle('hidden',mode!=='editor');
+  document.getElementById('promoModal').classList.remove('active');
+}
+
+function startComputerMode(){
+  editorMode=false;
+  setMode('play');
+  initBoard();
+}
+
+function returnToMainMenu(){
+  cancelStockfishSearch();
+  editorMode=false;
+  aiThinking=false;
+  selected=null;
+  hints=[];
+  setMode('menu');
+}
+
 function enterEditorMode(){
 
   editorMode=true;
 
-  clearBoard();
+  board=Array(64).fill(null);
 
   resetGameState();
 
-  document.getElementById('editorPanel').classList.remove('hidden');
+  setMode('editor');
 
   renderPalette();
 
-  document.getElementById('status').textContent=
-    'Modo editor activo';
-}
-
-function finishEditorMode(){
-
-  const whiteKings=board.filter(p=>p==='K').length;
-  const blackKings=board.filter(p=>p==='k').length;
-
-  if(whiteKings!==1 || blackKings!==1){
-    alert('Debe haber exactamente un rey blanco y un rey negro.');
-    return;
-  }
-
-  editorMode=false;
-
-  turn=document.getElementById('editorTurn').value;
-
-  selected=null;
-  hints=[];
-
-  document.getElementById('editorPanel').classList.add('hidden');
-
   render();
 
-  updateStatus();
-
-  if(turn==='b'){
-    setTimeout(aiMove,300);
-  }
+  document.getElementById('status').textContent=
+    'Modo editor activo';
 }
 
 function renderPalette(){
@@ -564,8 +589,7 @@ function idx(r,c){return r*8+c}
 
 function newGame(){
   editorMode=false;
-  document.getElementById('editorPanel').classList.add('hidden');
-  initBoard();
+  startComputerMode();
 }
 
 function getLegalMoves(from,b,t,ep,cr){
@@ -1374,6 +1398,8 @@ function minimax(b,depth,alpha,beta,maxing,t){
 
 function playBlackMove(chosen,promotionPiece){
 
+  if(appMode!=='play')return;
+
   const[from,to]=chosen;
 
   saveState();
@@ -1420,7 +1446,7 @@ function playBlackMove(chosen,promotionPiece){
 
 function aiMove(){
 
-  if(gameOver||aiThinking)return;
+  if(appMode!=='play'||gameOver||aiThinking)return;
 
   aiThinking=true;
 
@@ -1430,6 +1456,11 @@ function aiMove(){
     diff===1?'IA pensando...':'Stockfish pensando...';
 
   setTimeout(()=>{
+
+    if(appMode!=='play'){
+      aiThinking=false;
+      return;
+    }
 
     if(resolveGameEndForTurn('b'))return;
 
@@ -1544,6 +1575,8 @@ function onSquareClick(i){
 
     return;
   }
+
+  if(appMode!=='play')return;
 
   if(turn!=='w'||gameOver||aiThinking)return;
 
@@ -1671,7 +1704,7 @@ function render(){
   }
 }
 
-initBoard();
+setMode('menu');
 
 function lockPortraitMode(){
   if(screen.orientation&&screen.orientation.lock){
