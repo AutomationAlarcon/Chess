@@ -374,6 +374,12 @@ button.active{background:#e94560;border-color:#e94560}
 
 <div id="editorControls" class="hidden">
   <button onclick="clearBoard()">Vaciar tablero</button>
+  <label class="smallLabel" for="editorTurn">Empiezan:</label>
+  <select id="editorTurn">
+    <option value="w">Blancas</option>
+    <option value="b">Negras</option>
+  </select>
+  <button onclick="startEditedGame()">Iniciar partida</button>
   <button onclick="returnToMainMenu()">Menú principal</button>
 </div>
 
@@ -541,6 +547,54 @@ function enterEditorMode(){
 
   document.getElementById('status').textContent=
     'Modo editor activo';
+}
+
+function startEditedGame(){
+
+  const whiteKings=board.filter(p=>p==='K').length;
+  const blackKings=board.filter(p=>p==='k').length;
+
+  if(whiteKings!==1 || blackKings!==1){
+    alert('Debe haber exactamente un rey blanco y un rey negro.');
+    return;
+  }
+
+  cancelStockfishSearch();
+
+  editorMode=false;
+  turn=document.getElementById('editorTurn').value;
+  selected=null;
+  hints=[];
+  lastMove=null;
+  gameOver=false;
+  capW=[];
+  capB=[];
+  moveList=[];
+  enPassant=null;
+  halfMove=0;
+  aiThinking=false;
+  blackHasCastled=false;
+  historyStack=[];
+  stockfishFailed=false;
+  castleRights={
+    wK:board[60]==='K'&&board[63]==='R',
+    wQ:board[60]==='K'&&board[56]==='R',
+    bK:board[4]==='k'&&board[7]==='r',
+    bQ:board[4]==='k'&&board[0]==='r'
+  };
+
+  resetStockfishGame();
+  setMode('play');
+  render();
+  updateStatus();
+  updateCaptures();
+  document.getElementById('moves').innerHTML='';
+
+  if(resolveGameEndForTurn(turn))return;
+
+  if(turn==='b'){
+    setTimeout(aiMove,300);
+  }
 }
 
 function renderPalette(){
