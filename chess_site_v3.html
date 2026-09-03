@@ -209,15 +209,30 @@ button.active{background:#e94560;border-color:#e94560}
   color:#aaa
 }
 
+#moveHistory{
+  background:#16213e;
+  border:1px solid #444;
+  border-radius:6px;
+  width:min(88vw,520px);
+  color:#ccc;
+  overflow:hidden
+}
+
+#moveHistory summary{
+  cursor:pointer;
+  padding:8px 10px;
+  color:#f0c040;
+  font-size:0.85rem;
+  font-weight:700
+}
+
 #moves{
   max-height:120px;
   overflow-y:auto;
-  background:#16213e;
-  border-radius:6px;
+  border-top:1px solid rgba(255,255,255,0.12);
   padding:6px 10px;
   font-size:0.78rem;
   font-family:monospace;
-  width:min(88vw,520px);
   color:#ccc
 }
 
@@ -392,7 +407,10 @@ button.active{background:#e94560;border-color:#e94560}
   <span id="captured-b">Capturas negras: —</span>
 </div>
 
-<div id="moves" class="hidden"></div>
+<details id="moveHistory" class="hidden">
+  <summary>Movimientos de la partida</summary>
+  <div id="moves"></div>
+</details>
 
 <div id="editorPanel" class="hidden">
 
@@ -466,7 +484,7 @@ function initBoard(){
   render();
   updateStatus();
 
-  document.getElementById('moves').innerHTML='';
+  resetMoveHistory();
 
   document.getElementById('captured-w').textContent='Capturas blancas: —';
   document.getElementById('captured-b').textContent='Capturas negras: —';
@@ -506,6 +524,11 @@ function clearBoard(){
   render();
 }
 
+function resetMoveHistory(){
+  document.getElementById('moves').innerHTML='';
+  document.getElementById('moveHistory').open=false;
+}
+
 function setMode(mode){
   appMode=mode;
 
@@ -515,7 +538,7 @@ function setMode(mode){
   document.getElementById('editorControls').classList.toggle('hidden',mode!=='editor');
   document.getElementById('board-wrap').classList.toggle('hidden',mode==='menu');
   document.getElementById('info').classList.toggle('hidden',mode!=='play');
-  document.getElementById('moves').classList.toggle('hidden',mode!=='play');
+  document.getElementById('moveHistory').classList.toggle('hidden',mode!=='play');
   document.getElementById('editorPanel').classList.toggle('hidden',mode!=='editor');
   document.getElementById('promoModal').classList.remove('active');
 }
@@ -592,7 +615,7 @@ function startEditedGame(){
   render();
   updateStatus();
   updateCaptures();
-  document.getElementById('moves').innerHTML='';
+  resetMoveHistory();
 
   if(resolveGameEndForTurn(turn))return;
 
