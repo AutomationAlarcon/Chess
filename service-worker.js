@@ -1,4 +1,4 @@
-const CACHE_NAME = 'chess-stockfish-pwa-v16';
+const CACHE_NAME = 'chess-stockfish-pwa-v17';
 
 const APP_ASSETS = [
   './',
@@ -31,6 +31,24 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+
+  const acceptsHtml = (event.request.headers.get('accept') || '').includes('text/html');
+  const isHtmlRequest = event.request.mode === 'navigate' ||
+    acceptsHtml ||
+    new URL(event.request.url).pathname.endsWith('.html');
+
+  if (isHtmlRequest) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' }).then(response => {
+        if (response && response.ok) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
 
   event.respondWith(
     caches.match(event.request).then(cached => {
