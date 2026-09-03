@@ -427,6 +427,10 @@ const PALETTE_PIECES={
   k:'♚',q:'♛',r:'♜',b:'♝',n:'♞',p:'♟'
 };
 
+const NOTATION_PIECES={
+  k:'R',q:'D',r:'T',b:'A',n:'C',p:''
+};
+
 let board,turn,selected,hints,lastMove,gameOver;
 let capW,capB,moveList,enPassant,castleRights;
 let halfMove,aiThinking,blackHasCastled;
@@ -1557,8 +1561,9 @@ function addMoveToList(from,to,t,cap,piece,promoPiece){
   else{
     const fc=String.fromCharCode(97+col(from))+(8-row(from));
     const tc=String.fromCharCode(97+col(to))+(8-row(to));
-    notation=fc+(cap?'x':'-')+tc;
-    if(promoPiece)notation+='='+promoPiece.toUpperCase();
+    const pieceLetter=NOTATION_PIECES[pt]??'';
+    notation=pieceLetter+fc+(cap?'x':'-')+tc;
+    if(promoPiece)notation+='='+(NOTATION_PIECES[promoPiece.toLowerCase()]??promoPiece.toUpperCase());
   }
 
   moveList.push(notation);
