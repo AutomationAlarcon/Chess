@@ -389,12 +389,13 @@ button.active{background:#e94560;border-color:#e94560}
 
 <div id="editorControls" class="hidden">
   <button onclick="clearBoard()">Vaciar tablero</button>
-  <label class="smallLabel" for="editorTurn">Empiezan:</label>
-  <select id="editorTurn">
+  <label class="smallLabel editorSetupOnly" for="editorTurn">Empiezan:</label>
+  <select id="editorTurn" class="editorSetupOnly">
     <option value="w">Blancas</option>
     <option value="b">Negras</option>
   </select>
-  <button onclick="startEditedGame()">Iniciar partida</button>
+  <button class="editorSetupOnly" onclick="startEditedGame()">Iniciar partida</button>
+  <button class="editorGameOnly hidden" onclick="undoMove()" title="Deshacer movimiento">↶</button>
   <button onclick="returnToMainMenu()">Menú principal</button>
 </div>
 
@@ -520,8 +521,15 @@ function resetGameState(){
 }
 
 function clearBoard(){
+  cancelStockfishSearch();
+  editorMode=true;
   board=Array(64).fill(null);
+  resetGameState();
+  resetMoveHistory();
+  setMode('editor');
+  renderPalette();
   render();
+  document.getElementById('status').textContent='Modo editor activo';
 }
 
 function resetMoveHistory(){
@@ -529,18 +537,32 @@ function resetMoveHistory(){
   document.getElementById('moveHistory').open=false;
 }
 
+function isPlayingMode(){
+  return appMode==='play'||appMode==='editedPlay';
+}
+
 function setMode(mode){
   appMode=mode;
+  const computerMode=mode==='play';
+  const editorSetupMode=mode==='editor';
+  const editedPlayMode=mode==='editedPlay';
+  const playingMode=computerMode||editedPlayMode;
 
   document.getElementById('mainMenu').classList.toggle('hidden',mode!=='menu');
-  document.getElementById('controls').classList.toggle('hidden',mode!=='play');
+  document.getElementById('controls').classList.toggle('hidden',!computerMode);
   document.getElementById('status').classList.toggle('hidden',mode==='menu');
-  document.getElementById('editorControls').classList.toggle('hidden',mode!=='editor');
+  document.getElementById('editorControls').classList.toggle('hidden',!(editorSetupMode||editedPlayMode));
   document.getElementById('board-wrap').classList.toggle('hidden',mode==='menu');
-  document.getElementById('info').classList.toggle('hidden',mode!=='play');
-  document.getElementById('moveHistory').classList.toggle('hidden',mode!=='play');
-  document.getElementById('editorPanel').classList.toggle('hidden',mode!=='editor');
+  document.getElementById('info').classList.toggle('hidden',!playingMode);
+  document.getElementById('moveHistory').classList.toggle('hidden',!playingMode);
+  document.getElementById('editorPanel').classList.toggle('hidden',!editorSetupMode);
   document.getElementById('promoModal').classList.remove('active');
+  document.querySelectorAll('.editorSetupOnly').forEach(el=>
+    el.classList.toggle('hidden',!editorSetupMode)
+  );
+  document.querySelectorAll('.editorGameOnly').forEach(el=>
+    el.classList.toggle('hidden',!editedPlayMode)
+  );
 }
 
 function startComputerMode(){
@@ -611,7 +633,7 @@ function startEditedGame(){
   };
 
   resetStockfishGame();
-  setMode('play');
+  setMode('editedPlay');
   render();
   updateStatus();
   updateCaptures();
@@ -1488,7 +1510,7 @@ function minimax(b,depth,alpha,beta,maxing,t){
 
 function playBlackMove(chosen,promotionPiece){
 
-  if(appMode!=='play')return;
+  if(!isPlayingMode())return;
 
   const[from,to]=chosen;
 
@@ -1536,7 +1558,7 @@ function playBlackMove(chosen,promotionPiece){
 
 function aiMove(){
 
-  if(appMode!=='play'||gameOver||aiThinking)return;
+  if(!isPlayingMode()||gameOver||aiThinking)return;
 
   aiThinking=true;
 
@@ -1547,7 +1569,7 @@ function aiMove(){
 
   setTimeout(()=>{
 
-    if(appMode!=='play'){
+    if(!isPlayingMode()){
       aiThinking=false;
       return;
     }
@@ -1667,7 +1689,7 @@ function onSquareClick(i){
     return;
   }
 
-  if(appMode!=='play')return;
+  if(!isPlayingMode())return;
 
   if(turn!=='w'||gameOver||aiThinking)return;
 
